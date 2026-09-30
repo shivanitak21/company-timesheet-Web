@@ -9,7 +9,7 @@ import { MonthCalendar } from '@/components/timesheet/MonthCalendar'
 import { Badge, Button, Card, EmptyState, ErrorText, PageHeader, SelectInput, Spinner, TextInput } from '@/components/ui/primitives'
 import { statusTone } from '@/lib/status'
 import { useCalendar, useEmployees, usePendingTimesheets } from '@/hooks/queries'
-import { currentYearMonth, formatHours, monthLabel, personName, shiftMonth, statusLabel } from '@/lib/format'
+import { currentYearMonth, dayTapMessage, formatHours, monthLabel, personName, shiftMonth, statusLabel } from '@/lib/format'
 import { useAuth } from '@/state/AuthProvider'
 import { useToast } from '@/state/ToastProvider'
 import type { CalendarDay } from '@/types/api'
@@ -87,7 +87,16 @@ export function TimesheetReview() {
           setCursor((current) => shiftMonth(current.year, current.month, delta))
           setSelected(null)
         }}
-        onSelect={setSelected}
+        onSelect={(day) => {
+          if (viewingSelf) {
+            const message = dayTapMessage(day)
+            if (message) {
+              toast.push(message, 'info')
+              return
+            }
+          }
+          setSelected(day)
+        }}
       />
       <EntryDrawer
         day={selected}

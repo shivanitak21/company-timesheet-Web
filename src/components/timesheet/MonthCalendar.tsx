@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Badge, Button, Card, Spinner } from '@/components/ui/primitives'
-import { formatHours, formatMinutes, monthLabel, statusLabel } from '@/lib/format'
+import { ENTRY_WINDOW_LABEL, formatHours, formatMinutes, monthLabel, statusLabel } from '@/lib/format'
 import { cn } from '@/lib/cn'
 import type { CalendarDay, MonthCalendar as MonthCalendarData, TimesheetStatus } from '@/types/api'
 
@@ -60,6 +60,9 @@ export function MonthCalendar({
           </div>
         </div>
       </div>
+      {data?.entryWindow ? (
+        <p className="mx-5 mt-4 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3 text-sm font-medium">{ENTRY_WINDOW_LABEL}</p>
+      ) : null}
       <div className="grid grid-cols-2 gap-3 px-5 py-4 sm:grid-cols-4">
         <Mini label="Month" value={formatHours(data?.monthlyTotalMinutes ?? 0)} suffix="h" />
         {(data?.weeklyTotals ?? []).slice(0, 3).map((week) => (
@@ -84,37 +87,46 @@ export function MonthCalendar({
           ))}
           {data?.days.map((day) => {
             const tone = dayTone(day, status)
-            const blockedQuiet = (day.isWeekend || day.isHoliday || day.isOnLeave || day.isFuture) && day.entryCount === 0
+            const isToday = data.entryWindow.today === day.date
+            const isYesterday = data.entryWindow.yesterday === day.date
+            const older = day.lockReasons.includes('entry_window') && !day.isFuture
+            const editable = day.isFillable
             return (
               <button
                 key={day.date}
                 type="button"
-                disabled={blockedQuiet}
                 onClick={() => onSelect(day)}
                 className={cn(
                   'relative min-h-28 border-r border-b border-line p-2 text-left transition sm:min-h-32 sm:p-3',
-                  selectedDate === day.date && 'ring-2 ring-accent ring-inset',
-                  data.today === day.date && 'bg-accent-soft/70',
-                  tone === 'weekend' && 'bg-ink/4 text-muted',
-                  tone === 'holiday' && 'bg-violet-500/10',
-                  tone === 'leave' && 'bg-sky-500/10',
-                  tone === 'future' && 'opacity-45',
-                  tone === 'missing' && 'bg-gold/8',
-                  tone === 'approved' && 'bg-accent-soft/80',
-                  tone === 'pending' && 'bg-gold/10',
-                  tone === 'rejected' && 'bg-danger/8',
-                  blockedQuiet ? 'cursor-not-allowed' : 'hover:bg-ink/4',
+                  selectedDate === day.date && editable && 'ring-2 ring-accent ring-inset',
+                  isToday && 'bg-accent-soft ring-2 ring-accent ring-inset',
+                  editable && isYesterday && 'bg-gold/15 ring-1 ring-gold ring-inset',
+                  day.isWeekend && 'bg-ink/5 text-muted',
+                  day.isHoliday && 'bg-violet-500/12',
+                  day.isOnLeave && 'bg-sky-500/12',
+                  day.isFuture && 'opacity-40',
+                  older && !day.isHoliday && !day.isOnLeave && !day.isWeekend && 'bg-ink/6 text-muted',
+                  !editable && 'cursor-default',
+                  editable && 'hover:brightness-[0.98]',
+                  tone === 'approved' && editable && 'bg-accent-soft/80',
+                  tone === 'pending' && editable && 'bg-gold/10',
+                  tone === 'rejected' && editable && 'bg-danger/8',
                 )}
               >
                 <div className="flex items-start justify-between gap-1">
-                  <span className={cn('text-sm font-semibold', data.today === day.date && 'text-accent')}>{Number(day.date.slice(8))}</span>
+                  <span className={cn('text-sm font-semibold', isToday && 'text-accent')}>{Number(day.date.slice(8))}</span>
                   {day.entryCount > 0 ? <span className="font-display text-sm">{formatHours(day.totalMinutes)}</span> : null}
                 </div>
                 <div className="mt-2 space-y-1">
+                  {isToday ? <p className="text-[11px] font-semibold text-accent">Today</p> : null}
+                  {isYesterday && editable ? <p className="text-[11px] font-semibold text-gold">Yesterday</p> : null}
                   {day.isHoliday ? <p className="line-clamp-2 text-[11px] font-medium text-violet-800 dark:text-violet-200">{day.holidayName}</p> : null}
                   {day.isOnLeave ? <p className="text-[11px] font-medium text-sky-800 dark:text-sky-200">Leave</p> : null}
                   {day.isWeekend ? <p className="text-[11px] text-muted">Weekend</p> : null}
-                  {tone === 'missing' ? <p className="text-[11px] font-semibold text-gold">Missing</p> : null}
+                  {day.isFuture ? <p className="text-[11px] text-muted">Future</p> : null}
+                  {older ? <p className="text-[11px] font-semibold text-muted">Locked</p> : null}
+                  {editable && day.entryCount === 0 ? <p className="text-[11px] font-semibold text-gold">Add</p> : null}
+                  {editable && day.entryCount > 0 ? <p className="text-[11px] font-semibold text-accent">Edit</p> : null}
                   {day.entryCount > 0 && status ? <p className="text-[11px] text-muted">{statusLabel(status)}</p> : null}
                   {day.totalMinutes > 0 ? <p className="text-[11px] text-muted">{formatMinutes(day.totalMinutes)}</p> : null}
                 </div>
@@ -124,8 +136,11 @@ export function MonthCalendar({
         </div>
       )}
       <div className="flex flex-wrap gap-2 px-5 py-4 text-xs text-muted">
-        <Legend swatch="bg-gold/30" label="Missing" />
-        <Legend swatch="bg-gold/50" label="Pending approval" />
+        <Legend swatch="bg-accent/50" label="Today" />
+        <Legend swatch="bg-gold/50" label="Yesterday" />
+        <Legend swatch="bg-ink/30" label="Locked" />
+        <Legend swatch="bg-ink/15" label="Future" />
+        <Legend swatch="bg-gold/30" label="Pending approval" />
         <Legend swatch="bg-accent/40" label="Approved" />
         <Legend swatch="bg-danger/40" label="Rejected" />
         <Legend swatch="bg-violet-400/60" label="Holiday" />

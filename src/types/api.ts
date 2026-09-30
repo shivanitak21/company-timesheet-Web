@@ -7,7 +7,16 @@ export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'cancelled'
 export type Priority = 'low' | 'medium' | 'high'
 export type ProjectStatus = 'active' | 'archived'
 export type EmploymentType = 'full_time' | 'part_time' | 'contract'
-export type LockReason = 'weekend' | 'holiday' | 'leave' | 'future' | 'previous_month' | 'pending_approval' | 'approved'
+export type LockReason = 'weekend' | 'holiday' | 'leave' | 'future' | 'previous_month' | 'entry_window' | 'pending_approval' | 'approved'
+
+export type EntryWindow = {
+  timezone: string
+  today: string
+  yesterday: string
+  openFrom: string
+  openThrough: string
+  message: string
+}
 
 export type PageMeta = {
   page: number
@@ -114,6 +123,7 @@ export type MonthCalendar = {
   year: number
   month: number
   today: string
+  entryWindow: EntryWindow
   timesheet: Timesheet | null
   dailyTotals: { date: string; totalMinutes: number }[]
   weeklyTotals: WeeklyTotal[]
@@ -125,6 +135,7 @@ export type DailyTimesheet = {
   date: string
   isFillable: boolean
   lockReasons: LockReason[]
+  entryWindow: EntryWindow
   timesheet: Timesheet | null
   entries: TimeEntry[]
   totalMinutes: number

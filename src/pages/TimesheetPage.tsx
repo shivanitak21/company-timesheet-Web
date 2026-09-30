@@ -1,17 +1,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { timesheetApi } from '@/api/resources'
 import { errorMessage } from '@/api/client'
 import { EntryDrawer } from '@/components/timesheet/EntryDrawer'
 import { MonthCalendar } from '@/components/timesheet/MonthCalendar'
 import { Button, ErrorText, PageHeader } from '@/components/ui/primitives'
 import { useCalendar } from '@/hooks/queries'
-import { currentYearMonth, lockMessage, shiftMonth } from '@/lib/format'
+import { coversOpenWindow, currentYearMonth, dayTapMessage, shiftMonth } from '@/lib/format'
 import { useToast } from '@/state/ToastProvider'
 import type { CalendarDay } from '@/types/api'
 
 export function TimesheetPage() {
   const [cursor, setCursor] = useState(currentYearMonth)
+  const [alignedToCompany, setAlignedToCompany] = useState(false)
   const [selected, setSelected] = useState<CalendarDay | null>(null)
   const calendar = useCalendar(cursor.year, cursor.month)
   const toast = useToast()
@@ -25,14 +26,24 @@ export function TimesheetPage() {
     },
     onError: (error) => toast.push(errorMessage(error), 'error'),
   })
-  const canSubmit = data?.timesheet && (data.timesheet.status === 'draft' || data.timesheet.status === 'rejected')
+  const companyToday = data?.entryWindow?.today
+  useEffect(() => {
+    if (!companyToday || alignedToCompany) return
+    const [year, month] = companyToday.split('-').map(Number)
+    if (year && month) setCursor({ year, month })
+    setAlignedToCompany(true)
+  }, [alignedToCompany, companyToday])
+  const canSubmit =
+    Boolean(data?.timesheet) &&
+    coversOpenWindow(cursor.year, cursor.month, data?.entryWindow?.today, data?.entryWindow?.yesterday) &&
+    (data?.timesheet?.status === 'draft' || data?.timesheet?.status === 'rejected')
 
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow="Time"
         title="Timesheet"
-        description="Only current-month working days can be filled. Weekends, holidays, approved leave, future dates, and locked months follow the API."
+        description="The month stays visible. Add and edit follow the days the API marks as open."
         actions={
           <Button disabled={!canSubmit || submit.isPending} onClick={() => data?.timesheet && submit.mutate(data.timesheet.id)}>
             Submit for approval
@@ -52,9 +63,9 @@ export function TimesheetPage() {
           setSelected(null)
         }}
         onSelect={(day) => {
-          const quiet = (day.isWeekend || day.isHoliday || day.isOnLeave || day.isFuture) && day.entryCount === 0
-          if (quiet) {
-            toast.push(lockMessage(day.lockReasons), 'info')
+          const message = dayTapMessage(day)
+          if (message) {
+            toast.push(message, 'info')
             return
           }
           setSelected(day)

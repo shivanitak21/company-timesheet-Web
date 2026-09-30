@@ -6,13 +6,29 @@ const LOCK_COPY: Record<LockReason, string> = {
   leave: 'Approved leave dates are not fillable.',
   future: 'Future dates cannot be filled.',
   previous_month: 'Previous months are locked.',
+  entry_window: 'Timesheet entry is available only for today and yesterday.',
   pending_approval: 'Submitted timesheets are pending approval and cannot be edited.',
   approved: 'Approved timesheets are locked.',
 }
 
+export const ENTRY_WINDOW_LABEL = 'Entry window: Today + Yesterday'
+export const ENTRY_WINDOW_TAP = 'Timesheet entry is available only for today and yesterday.'
+
 export function lockMessage(reasons: readonly LockReason[]): string {
   if (reasons.length === 0) return 'This date cannot be filled.'
   return reasons.map((reason) => LOCK_COPY[reason]).join(' ')
+}
+
+export function dayTapMessage(day: { isFillable: boolean; lockReasons: readonly LockReason[] }): string | null {
+  if (day.isFillable) return null
+  if (day.lockReasons.includes('entry_window') || day.lockReasons.includes('future')) return ENTRY_WINDOW_TAP
+  return lockMessage(day.lockReasons)
+}
+
+export function coversOpenWindow(year: number, month: number, today?: string, yesterday?: string) {
+  if (!today || !yesterday) return false
+  const key = `${year}-${String(month).padStart(2, '0')}`
+  return key === today.slice(0, 7) || key === yesterday.slice(0, 7)
 }
 
 export function formatMinutes(minutes: number): string {
